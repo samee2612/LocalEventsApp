@@ -2,29 +2,27 @@
 
 A small app for discovering upcoming local events using a FastAPI backend and a simple frontend.
 
-## Project Status
-
-This repository is being built as a time-boxed technical assessment. The current implementation includes:
-
-- FastAPI backend structure with JamBase-backed event search
-- Frontend app structure
-- Environment configuration examples
-- README and delivery-writeup placeholders
-
 ## Tech Stack
 
 - Backend: Python, FastAPI, HTTPX
 - Frontend: Vite, vanilla JavaScript
+
+## What It Does
+
+- Search for upcoming live events by city or metro-style location input
+- Fetch live event data from the JamBase API
+- Show event cards with date, venue, lineup, image, and relevant outbound links
+- Handle loading, empty, and error states cleanly
 
 ## Local Development
 
 ### Backend
 
 ```bash
-cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
+cd backend
 uvicorn app.main:app --reload
 ```
 
@@ -39,6 +37,11 @@ npm run dev
 ## Environment Variables
 
 Copy `.env.example` to `.env` and provide a valid `JAMBASE_API_KEY`.
+
+Defaults assume:
+
+- backend runs at `http://127.0.0.1:8000`
+- frontend runs at `http://127.0.0.1:5173`
 
 ## API
 
@@ -58,59 +61,88 @@ Query parameters:
 - `page`: page number, defaults to `1`
 - `per_page`: page size, capped server-side
 
+## Smoke Test
+
+Verified locally on **Sunday, August 23, 2026** with:
+
+- FastAPI backend running on `127.0.0.1:8000`
+- Vite frontend running on `127.0.0.1:5173`
+- End-to-end browser flow returning live JamBase results for `San Francisco, CA`
+
 ## Deliverables Checklist
 
-- [ ] Working FastAPI backend
-- [ ] Working event search UI
-- [ ] JamBase integration
-- [ ] README with setup instructions
-- [ ] Time spent summary
-- [ ] Short assessment writeup
+- [x] Working FastAPI backend
+- [x] Working event search UI
+- [x] JamBase integration
+- [x] README with setup instructions
+- [x] Time spent summary
+- [x] Short assessment writeup
 
 ## Assessment Writeup
 
 ### Time Spent
 
-In progress.
+About 3 hours total.
 
 ### Technology Choices
 
-In progress.
+- **FastAPI** for a small but well-structured Python backend with strong typing and clear request validation.
+- **HTTPX** for JamBase API integration because it keeps the external client layer simple and testable.
+- **Vanilla JS + Vite** for the frontend to keep scope tight and avoid spending assessment time on framework setup overhead.
 
 ### Backend/API Design
 
-In progress.
+- Exposed a single focused endpoint: `GET /api/events`
+- Kept JamBase integration behind a dedicated service layer so provider-specific logic is not mixed into the route handler.
+- Normalized JamBase data into a frontend-friendly response shape to reduce coupling to raw provider payloads.
+- Added defensive handling for missing API keys, invalid locations, timeouts, rate limits, and upstream failures.
 
 ### UI Design Decisions
 
-In progress.
+- Used a single search box because the prompt prioritized usefulness over feature breadth.
+- Chose card-based results instead of a raw list or table so users can quickly scan event name, date, venue, lineup, and links.
+- Added a lightweight “Why go” note to show product judgment and make the UI slightly more decision-oriented.
+- Focused on loading, error, and empty states rather than visual polish.
 
 ### Tradeoffs Made
 
-In progress.
+- Limited search to a free-text location input rather than building filters for genre, date, or distance.
+- Used live JamBase requests directly instead of adding caching or persistence.
+- Kept the frontend framework-free to stay within the timebox.
+- Chose a single provider integration path instead of building a full multi-provider abstraction up front.
 
 ### Improvements With More Time
 
-In progress.
+- Add tests for the JamBase service and API route behavior.
+- Improve location resolution with better handling for ambiguous city names.
+- Add filters such as date range, genre, and price.
+- Add caching to reduce repeated provider calls and improve perceived speed.
+- Refine event ranking so results feel more curated than simply upcoming.
 
 ### How AI Was Used
 
-In progress.
+- Used AI to accelerate scaffolding, backend integration structure, frontend UI implementation, and iteration on README/writeup content.
+- Used AI as a debugging partner during live integration testing, especially around JamBase endpoint assumptions and local CORS issues.
+- Still validated key assumptions manually by running the app, checking JamBase’s current documentation, and doing a browser smoke test.
 
 ### One AI Suggestion I Changed Or Rejected
 
-In progress.
+- An early integration approach assumed the city lookup endpoint was `/v3/cities`, which was wrong. I corrected it after checking JamBase’s current docs and switched to `/v3/geographies/cities`.
 
 ### Biggest Technical Limitation
 
-In progress.
+- The app depends on live provider calls at request time and does not cache or persist normalized event data, so performance and reliability are limited by JamBase availability and latency.
 
 ### Evolving To 10 Event Providers
 
-In progress.
+- Introduce a provider interface such as `search_events(location, page, per_page) -> normalized response`.
+- Move each provider into its own adapter with shared normalized domain models.
+- Add a provider orchestration layer for fan-out, deduplication, source ranking, and partial-failure handling.
+- Cache normalized event records and resolve conflicts across providers instead of serving directly from upstream responses.
+- Separate ingestion from read APIs so the user-facing app reads from a local store rather than from live provider calls.
 
 ### Self-Grade
 
-- Code quality: In progress
-- Work product: In progress
-- Extensibility: In progress
+- Code quality: B+
+- Work product: B
+- Extensibility: B

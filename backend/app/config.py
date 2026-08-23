@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     max_results_per_page: int = Field(default=24, alias="MAX_RESULTS_PER_PAGE")
     event_window_days: int = Field(default=30, alias="EVENT_WINDOW_DAYS")
     backend_cors_origins: list[str] = Field(
-        default=["http://localhost:5173"],
+        default=["http://localhost:5173", "http://127.0.0.1:5173"],
         alias="BACKEND_CORS_ORIGINS",
     )
 
