@@ -154,7 +154,7 @@ Verified locally on **Sunday, August 23, 2026** with:
 
 ### Time Spent
 
-About 4 hours total.
+About 1 hour 45 minutes total.
 
 ### Technology Choices
 

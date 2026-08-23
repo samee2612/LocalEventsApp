@@ -30,9 +30,9 @@ a {
 }
 
 .shell {
-  max-width: 1180px;
+  width: min(100%, 1800px);
   margin: 0 auto;
-  padding: 72px 24px;
+  padding: 56px 32px 72px;
   display: grid;
   gap: 28px;
 }
@@ -45,7 +45,7 @@ a {
   box-shadow: var(--shadow);
   display: grid;
   gap: 24px;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
 }
 
 .eyebrow {
@@ -65,7 +65,7 @@ h1 {
 
 .lede {
   margin: 0;
-  max-width: 40rem;
+  max-width: 48rem;
   font-size: 1.05rem;
   line-height: 1.6;
   color: var(--ink-soft);
@@ -267,8 +267,8 @@ h1 {
 
 .results-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
 }
 
 .event-card {
@@ -395,6 +395,7 @@ h1 {
 
 @media (max-width: 640px) {
   .shell {
+    width: 100%;
     padding: 24px 16px 48px;
   }
 
