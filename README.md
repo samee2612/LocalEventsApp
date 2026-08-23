@@ -4,9 +4,9 @@ A small app for discovering upcoming local events using a FastAPI backend and a 
 
 ## Project Status
 
-This repository is being built as a time-boxed technical assessment. The current scaffold includes:
+This repository is being built as a time-boxed technical assessment. The current implementation includes:
 
-- FastAPI backend structure
+- FastAPI backend structure with JamBase-backed event search
 - Frontend app structure
 - Environment configuration examples
 - README and delivery-writeup placeholders
@@ -39,6 +39,24 @@ npm run dev
 ## Environment Variables
 
 Copy `.env.example` to `.env` and provide a valid `JAMBASE_API_KEY`.
+
+## API
+
+### `GET /api/events`
+
+Search for upcoming events in a city or metro area.
+
+Example:
+
+```bash
+curl "http://localhost:8000/api/events?location=San%20Francisco"
+```
+
+Query parameters:
+
+- `location`: free-text city or metro name
+- `page`: page number, defaults to `1`
+- `per_page`: page size, capped server-side
 
 ## Deliverables Checklist
 
