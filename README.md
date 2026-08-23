@@ -13,8 +13,11 @@ A small app for discovering upcoming local events using a FastAPI backend and a 
 - Fetch live event data from the JamBase API
 - Show event cards with date, venue, lineup, image, genre tags, and relevant outbound links
 - Highlight a featured “Top pick” to help users decide faster
+- Let users narrow results with quick genre and time-window filters
 - Handle loading, empty, and error states cleanly
-- Include backend tests for core normalization and route behavior
+- Cache recent event searches to reduce repeated provider calls
+- Use smarter city matching when JamBase returns multiple location candidates
+- Include backend tests for normalization, caching, location matching, and route behavior
 
 ## Local Development
 
@@ -51,6 +54,7 @@ Defaults assume:
 
 - backend runs at `http://127.0.0.1:8000`
 - frontend runs at `http://127.0.0.1:5173`
+- cache TTL defaults to `300` seconds
 
 ## API
 
@@ -70,6 +74,62 @@ Query parameters:
 - `page`: page number, defaults to `1`
 - `per_page`: page size, capped server-side
 
+## How To Test
+
+### 1. Run the app locally
+
+Backend:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+cd backend
+uvicorn app.main:app --reload
+```
+
+Frontend in a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open `http://127.0.0.1:5173`.
+
+### 2. Test the backend automatically
+
+From the repo root:
+
+```bash
+source .venv/bin/activate
+pytest backend/tests
+```
+
+Current expected result:
+
+- `9 passed`
+
+### 3. Smoke test the user flow manually
+
+- Search for `San Francisco, CA`
+- Confirm events load and the featured `Top pick` appears
+- Change the `When` filter to `Today` and verify the result count drops
+- Change the `Genre` filter and verify the result list narrows further
+- Open an event details or ticket link from a card
+
+### 4. Check caching quickly
+
+- Search for the same city twice in a row
+- The second request should reuse the recent cached backend result for up to `300` seconds
+- If you want to shorten that for testing, change `CACHE_TTL_SECONDS` in `.env`
+
+### 5. Check smarter location matching
+
+- Try searches with state hints such as `Portland, OR` or `San Francisco, CA`
+- The backend should prefer the city candidate that matches the provided state hint instead of blindly taking the first result
+
 ## Smoke Test
 
 Verified locally on **Sunday, August 23, 2026** with:
@@ -78,7 +138,8 @@ Verified locally on **Sunday, August 23, 2026** with:
 - Vite frontend running on `127.0.0.1:5173`
 - End-to-end browser flow returning live JamBase results for `San Francisco, CA`
 - Featured “Top pick” rendering correctly in the live UI
-- Backend test suite passing: `6 passed`
+- Genre and time-window filters working in the live UI
+- Backend test suite passing: `9 passed`
 
 ## Deliverables Checklist
 
@@ -107,27 +168,29 @@ About 4 hours total.
 - Kept JamBase integration behind a dedicated service layer so provider-specific logic is not mixed into the route handler.
 - Normalized JamBase data into a frontend-friendly response shape to reduce coupling to raw provider payloads.
 - Added defensive handling for missing API keys, invalid locations, timeouts, rate limits, and upstream failures.
-- Added backend tests for normalization, sorting, provider error mapping, and route behavior.
+- Added a small in-memory cache for repeated searches to reduce unnecessary provider calls.
+- Added smarter location scoring so state-qualified searches make a more intentional city selection.
+- Added backend tests for normalization, sorting, cache behavior, location matching, provider error mapping, and route behavior.
 
 ### UI Design Decisions
 
 - Used a single search box because the prompt prioritized usefulness over feature breadth.
 - Chose card-based results instead of a raw list or table so users can quickly scan event name, date, venue, lineup, and links.
-- Added a lightweight “Why go” note, genre tags, and a featured “Top pick” block to make the UI more decision-oriented.
+- Added a lightweight “Why go” note, genre tags, quick filters, and a featured “Top pick” block to make the UI more decision-oriented.
 - Focused on loading, error, and empty states rather than visual polish.
 
 ### Tradeoffs Made
 
 - Limited search to a free-text location input rather than building filters for genre, date, or distance.
-- Used live JamBase requests directly instead of adding caching or persistence.
+- Added only a simple in-memory cache rather than a persistent or distributed cache layer.
 - Kept the frontend framework-free to stay within the timebox.
 - Chose a single provider integration path instead of building a full multi-provider abstraction up front.
 
 ### Improvements With More Time
 
 - Improve location resolution with better handling for ambiguous city names.
-- Add filters such as date range, genre, and price.
-- Add caching to reduce repeated provider calls and improve perceived speed.
+- Add richer filters such as price, venue type, and custom date ranges.
+- Replace the in-memory cache with a persistent store or distributed cache.
 - Refine the featured ranking heuristic so it feels more curated than simply “earliest upcoming.”
 
 ### How AI Was Used
@@ -142,7 +205,7 @@ About 4 hours total.
 
 ### Biggest Technical Limitation
 
-- The app depends on live provider calls at request time and does not cache or persist normalized event data, so performance and reliability are limited by JamBase availability and latency.
+- The app still depends on live provider calls at request time and only uses a simple in-memory cache, so performance and reliability are still tightly coupled to JamBase availability and latency.
 
 ### Evolving To 10 Event Providers
 
@@ -154,6 +217,6 @@ About 4 hours total.
 
 ### Self-Grade
 
-- Code quality: A-
-- Work product: A-
-- Extensibility: B+
+- Code quality: A
+- Work product: A
+- Extensibility: A-

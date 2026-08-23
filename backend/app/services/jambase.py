@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -38,7 +38,15 @@ class ResolvedLocation:
     geo_metro_id: str | None
 
 
+@dataclass
+class CachedResponse:
+    expires_at: datetime
+    value: EventSearchResponse
+
+
 class JamBaseClient:
+    _cache: dict[tuple[str, int, int], CachedResponse] = {}
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
@@ -52,6 +60,11 @@ class JamBaseClient:
         if not self.settings.jambase_api_key:
             raise JamBaseConfigurationError()
 
+        cache_key = (location_query.strip().lower(), page, per_page)
+        cached = self._get_cached_response(cache_key)
+        if cached is not None:
+            return cached
+
         location = await self._resolve_location(location_query)
         events_payload = await self._fetch_events(location=location, page=page, per_page=per_page)
 
@@ -60,7 +73,7 @@ class JamBaseClient:
         normalized_events = [self._normalize_event(event) for event in raw_events]
         sorted_events = sorted(normalized_events, key=self._event_sort_key)
 
-        return EventSearchResponse(
+        response = EventSearchResponse(
             location=SearchLocation(
                 display_name=location.display_name,
                 city=location.city,
@@ -77,9 +90,11 @@ class JamBaseClient:
             ),
             events=sorted_events,
         )
+        self._set_cached_response(cache_key, response)
+        return response
 
     async def _resolve_location(self, location_query: str) -> ResolvedLocation:
-        city_name, state_iso = self._parse_location_query(location_query)
+        city_name, state_iso, country_hint = self._parse_location_query(location_query)
         params: dict[str, Any] = {"geoCityName": city_name, "perPage": 5}
         if state_iso:
             params["geoStateIso"] = state_iso
@@ -92,7 +107,15 @@ class JamBaseClient:
         if not cities:
             raise JamBaseLocationNotFoundError(location_query)
 
-        best_match = cities[0]
+        best_match = max(
+            cities,
+            key=lambda city: self._city_match_score(
+                city=city,
+                city_name=city_name,
+                state_iso=state_iso,
+                country_hint=country_hint,
+            ),
+        )
         return ResolvedLocation(
             display_name=self._build_location_label(best_match, location_query),
             city=self._first_string(best_match, "name", "city", "geoCityName"),
@@ -312,18 +335,84 @@ class JamBaseClient:
         except ValueError:
             return None
 
-    def _parse_location_query(self, location_query: str) -> tuple[str, str | None]:
+    def _get_cached_response(
+        self,
+        cache_key: tuple[str, int, int],
+    ) -> EventSearchResponse | None:
+        cached = self._cache.get(cache_key)
+        if cached is None:
+            return None
+
+        now = datetime.now(UTC)
+        if cached.expires_at <= now:
+            self._cache.pop(cache_key, None)
+            return None
+
+        return cached.value
+
+    def _set_cached_response(
+        self,
+        cache_key: tuple[str, int, int],
+        response: EventSearchResponse,
+    ) -> None:
+        now = datetime.now(UTC)
+        self._cache[cache_key] = CachedResponse(
+            expires_at=now + timedelta(seconds=self.settings.cache_ttl_seconds),
+            value=response,
+        )
+
+    def _parse_location_query(
+        self,
+        location_query: str,
+    ) -> tuple[str, str | None, str | None]:
         parts = [part.strip() for part in location_query.split(",") if part.strip()]
         if not parts:
-            return location_query.strip(), None
+            return location_query.strip(), None, None
 
         city_name = parts[0]
         if len(parts) == 1:
-            return city_name, None
+            return city_name, None, None
 
         state_part = parts[1].upper()
+        country_hint = parts[2].upper() if len(parts) >= 3 else None
         if len(state_part) == 2:
-            return city_name, f"US-{state_part}"
+            return city_name, f"US-{state_part}", country_hint
         if state_part.startswith("US-"):
-            return city_name, state_part
-        return city_name, None
+            return city_name, state_part, country_hint
+        return city_name, None, state_part if country_hint is None else country_hint
+
+    def _city_match_score(
+        self,
+        *,
+        city: dict[str, Any],
+        city_name: str,
+        state_iso: str | None,
+        country_hint: str | None,
+    ) -> tuple[int, int, int, str]:
+        candidate_city = (
+            self._first_string(city, "name", "city", "geoCityName") or ""
+        ).strip().lower()
+        candidate_state = (
+            self._first_string(city, "stateIso", "region", "geoStateIso") or ""
+        ).strip().upper()
+        candidate_country = (
+            self._first_string(city, "countryIso2", "country", "geoCountryIso2") or ""
+        ).strip().upper()
+
+        query_city = city_name.strip().lower()
+        exact_city = int(candidate_city == query_city)
+        prefix_city = int(candidate_city.startswith(query_city) or query_city.startswith(candidate_city))
+
+        state_match = 0
+        if state_iso:
+            state_match = int(candidate_state == state_iso.upper())
+
+        country_match = 0
+        if country_hint:
+            normalized_hint = country_hint.replace("US-", "").upper()
+            country_match = int(
+                candidate_country == normalized_hint
+                or candidate_state.endswith(normalized_hint)
+            )
+
+        return (state_match, country_match, exact_city + prefix_city, candidate_city)

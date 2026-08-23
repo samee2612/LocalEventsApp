@@ -38,6 +38,22 @@ app.innerHTML = `
         </div>
         <p class="results-meta" data-results-meta>Search a city to get started.</p>
       </div>
+      <section class="filter-bar" data-filters hidden>
+        <label class="filter-field">
+          <span class="field-label">Genre</span>
+          <select class="field-select" name="genre">
+            <option value="">All genres</option>
+          </select>
+        </label>
+        <label class="filter-field">
+          <span class="field-label">When</span>
+          <select class="field-select" name="timeWindow">
+            <option value="all">Any time</option>
+            <option value="today">Today</option>
+            <option value="week">Next 7 days</option>
+          </select>
+        </label>
+      </section>
       <section class="featured-pick" data-featured hidden></section>
       <div class="status-card" data-status>
         Enter a city to load upcoming events.
@@ -53,9 +69,13 @@ const statusCard = app.querySelector("[data-status]");
 const resultsGrid = app.querySelector("[data-results]");
 const resultsMeta = app.querySelector("[data-results-meta]");
 const featuredPick = app.querySelector("[data-featured]");
+const filtersBar = app.querySelector("[data-filters]");
+const genreSelect = filtersBar.querySelector('select[name="genre"]');
+const timeWindowSelect = filtersBar.querySelector('select[name="timeWindow"]');
 const submitButton = form.querySelector("button");
 
 let activeRequestId = 0;
+let latestPayload = null;
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -83,7 +103,9 @@ form.addEventListener("submit", async (event) => {
       throw new Error(payload.detail || "Unable to load events right now.");
     }
 
-    renderResults(payload);
+    latestPayload = payload;
+    populateFilters(payload.events);
+    applyFilters();
   } catch (error) {
     if (requestId !== activeRequestId) {
       return;
@@ -96,6 +118,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 form.requestSubmit();
+genreSelect.addEventListener("change", applyFilters);
+timeWindowSelect.addEventListener("change", applyFilters);
 
 function setLoadingState(location) {
   submitButton.disabled = true;
@@ -107,23 +131,24 @@ function setLoadingState(location) {
   resultsGrid.innerHTML = "";
   featuredPick.hidden = true;
   featuredPick.innerHTML = "";
+  filtersBar.hidden = true;
   resultsMeta.textContent = "Loading live data from JamBase.";
 }
 
-function renderResults(payload) {
+function renderResults(payload, events) {
   submitButton.disabled = false;
   submitButton.textContent = "Find events";
 
-  const events = Array.isArray(payload.events) ? payload.events : [];
   const locationLabel = payload.location?.display_name || "your area";
-  const totalItems = payload.pagination?.total_items ?? events.length;
+  const totalItems = events.length;
 
-  resultsMeta.textContent = `${totalItems} upcoming events found for ${locationLabel}.`;
+  resultsMeta.textContent = `${totalItems} matching events for ${locationLabel}.`;
+  filtersBar.hidden = false;
 
   if (!events.length) {
     statusCard.hidden = false;
     statusCard.className = "status-card";
-    statusCard.textContent = `No upcoming events found for ${locationLabel}. Try another nearby city.`;
+    statusCard.textContent = `No events match the current filters for ${locationLabel}.`;
     resultsGrid.hidden = true;
     resultsGrid.innerHTML = "";
     featuredPick.hidden = true;
@@ -145,9 +170,80 @@ function renderError(message) {
   resultsGrid.innerHTML = "";
   featuredPick.hidden = true;
   featuredPick.innerHTML = "";
+  filtersBar.hidden = true;
   statusCard.hidden = false;
   statusCard.className = "status-card status-card-error";
   statusCard.textContent = message;
+}
+
+function populateFilters(events = []) {
+  const genres = Array.from(
+    new Set(
+      events.flatMap((event) => (Array.isArray(event.genres) ? event.genres : [])),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+
+  const selectedGenre = genreSelect.value;
+  genreSelect.innerHTML = `
+    <option value="">All genres</option>
+    ${genres
+      .map(
+        (genre) =>
+          `<option value="${escapeHtml(genre)}">${escapeHtml(genre)}</option>`,
+      )
+      .join("")}
+  `;
+
+  if (genres.includes(selectedGenre)) {
+    genreSelect.value = selectedGenre;
+  }
+}
+
+function applyFilters() {
+  if (!latestPayload) {
+    return;
+  }
+
+  const filteredEvents = filterEvents(latestPayload.events ?? []);
+  renderResults(latestPayload, filteredEvents);
+}
+
+function filterEvents(events = []) {
+  const selectedGenre = genreSelect.value;
+  const selectedTimeWindow = timeWindowSelect.value;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekFromNow = new Date(today);
+  weekFromNow.setDate(weekFromNow.getDate() + 7);
+
+  return events.filter((event) => {
+    const matchesGenre =
+      !selectedGenre ||
+      (Array.isArray(event.genres) && event.genres.includes(selectedGenre));
+
+    if (!matchesGenre) {
+      return false;
+    }
+
+    if (selectedTimeWindow === "all") {
+      return true;
+    }
+
+    const parsed = event.start_date ? new Date(event.start_date) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return false;
+    }
+
+    if (selectedTimeWindow === "today") {
+      return parsed.toDateString() === today.toDateString();
+    }
+
+    if (selectedTimeWindow === "week") {
+      return parsed >= today && parsed < weekFromNow;
+    }
+
+    return true;
+  });
 }
 
 function renderFeaturedPick(event, locationLabel) {

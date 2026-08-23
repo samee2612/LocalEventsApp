@@ -1,5 +1,8 @@
+from datetime import UTC, datetime, timedelta
+
 from app.config import Settings
-from app.services.jambase import JamBaseClient
+from app.models import EventSearchResponse, PaginationSummary, SearchLocation
+from app.services.jambase import CachedResponse, JamBaseClient
 
 
 def build_client() -> JamBaseClient:
@@ -90,7 +93,75 @@ def test_search_results_are_sorted_by_start_date() -> None:
 def test_parse_location_query_accepts_state_shorthand() -> None:
     client = build_client()
 
-    city_name, state_iso = client._parse_location_query("San Francisco, CA")
+    city_name, state_iso, country_hint = client._parse_location_query("San Francisco, CA")
 
     assert city_name == "San Francisco"
     assert state_iso == "US-CA"
+    assert country_hint is None
+
+
+def test_city_match_score_prefers_exact_state_match() -> None:
+    client = build_client()
+
+    matching_city = {
+        "name": "Portland",
+        "stateIso": "US-OR",
+        "countryIso2": "US",
+    }
+    non_matching_city = {
+        "name": "Portland",
+        "stateIso": "US-ME",
+        "countryIso2": "US",
+    }
+
+    matching_score = client._city_match_score(
+        city=matching_city,
+        city_name="Portland",
+        state_iso="US-OR",
+        country_hint=None,
+    )
+    non_matching_score = client._city_match_score(
+        city=non_matching_city,
+        city_name="Portland",
+        state_iso="US-OR",
+        country_hint=None,
+    )
+
+    assert matching_score > non_matching_score
+
+
+def test_cached_response_is_returned_when_fresh() -> None:
+    client = build_client()
+    response = EventSearchResponse(
+        location=SearchLocation(display_name="San Francisco"),
+        pagination=PaginationSummary(page=1, per_page=12, total_items=0, total_pages=0),
+        events=[],
+    )
+    cache_key = ("san francisco", 1, 12)
+    client._cache[cache_key] = CachedResponse(
+        expires_at=datetime.now(UTC) + timedelta(seconds=30),
+        value=response,
+    )
+
+    cached = client._get_cached_response(cache_key)
+
+    assert cached == response
+
+
+def test_expired_cached_response_is_ignored() -> None:
+    client = build_client()
+    response = EventSearchResponse(
+        location=SearchLocation(display_name="San Francisco"),
+        pagination=PaginationSummary(page=1, per_page=12, total_items=0, total_pages=0),
+        events=[],
+    )
+    cache_key = ("san francisco", 1, 12)
+    client._cache[cache_key] = CachedResponse(
+        expires_at=datetime.now(UTC) - timedelta(seconds=1),
+        value=response,
+    )
+
+    cached = client._get_cached_response(cache_key)
+
+    assert cached is None
+    assert cache_key not in client._cache
