@@ -38,6 +38,7 @@ app.innerHTML = `
         </div>
         <p class="results-meta" data-results-meta>Search a city to get started.</p>
       </div>
+      <section class="featured-pick" data-featured hidden></section>
       <div class="status-card" data-status>
         Enter a city to load upcoming events.
       </div>
@@ -51,6 +52,7 @@ const locationInput = form.querySelector('input[name="location"]');
 const statusCard = app.querySelector("[data-status]");
 const resultsGrid = app.querySelector("[data-results]");
 const resultsMeta = app.querySelector("[data-results-meta]");
+const featuredPick = app.querySelector("[data-featured]");
 const submitButton = form.querySelector("button");
 
 let activeRequestId = 0;
@@ -103,6 +105,8 @@ function setLoadingState(location) {
   statusCard.textContent = `Looking for upcoming events in ${location}...`;
   resultsGrid.hidden = true;
   resultsGrid.innerHTML = "";
+  featuredPick.hidden = true;
+  featuredPick.innerHTML = "";
   resultsMeta.textContent = "Loading live data from JamBase.";
 }
 
@@ -122,10 +126,13 @@ function renderResults(payload) {
     statusCard.textContent = `No upcoming events found for ${locationLabel}. Try another nearby city.`;
     resultsGrid.hidden = true;
     resultsGrid.innerHTML = "";
+    featuredPick.hidden = true;
+    featuredPick.innerHTML = "";
     return;
   }
 
   statusCard.hidden = true;
+  renderFeaturedPick(events[0], locationLabel);
   resultsGrid.hidden = false;
   resultsGrid.innerHTML = events.map(renderEventCard).join("");
 }
@@ -136,9 +143,49 @@ function renderError(message) {
   resultsMeta.textContent = "Search unavailable.";
   resultsGrid.hidden = true;
   resultsGrid.innerHTML = "";
+  featuredPick.hidden = true;
+  featuredPick.innerHTML = "";
   statusCard.hidden = false;
   statusCard.className = "status-card status-card-error";
   statusCard.textContent = message;
+}
+
+function renderFeaturedPick(event, locationLabel) {
+  if (!event) {
+    featuredPick.hidden = true;
+    featuredPick.innerHTML = "";
+    return;
+  }
+
+  const when = formatDate(event.start_date);
+  const genres = Array.isArray(event.genres) && event.genres.length
+    ? event.genres.join(", ")
+    : "live music";
+  const hook = buildFeaturedHook(event);
+
+  featuredPick.hidden = false;
+  featuredPick.innerHTML = `
+    <div class="featured-copy">
+      <p class="section-label">Top pick in ${escapeHtml(locationLabel)}</p>
+      <h3 class="featured-title">${escapeHtml(event.name)}</h3>
+      <p class="featured-summary">
+        ${escapeHtml(hook)} Happening ${escapeHtml(when)} at ${escapeHtml(formatVenue(event))}.
+      </p>
+      <p class="featured-genres">Best for: ${escapeHtml(genres)}</p>
+    </div>
+    <div class="featured-actions">
+      ${
+        event.event_url
+          ? `<a class="event-link" href="${escapeHtml(event.event_url)}" target="_blank" rel="noreferrer">See details</a>`
+          : ""
+      }
+      ${
+        event.ticket_url
+          ? `<a class="event-link event-link-accent" href="${escapeHtml(event.ticket_url)}" target="_blank" rel="noreferrer">Get tickets</a>`
+          : ""
+      }
+    </div>
+  `;
 }
 
 function renderEventCard(event) {
@@ -272,6 +319,18 @@ function buildRecommendation(event) {
   }
 
   return "Worth a closer look if the artist is already on your radar.";
+}
+
+function buildFeaturedHook(event) {
+  if (Array.isArray(event.headliners) && event.headliners.length > 1) {
+    return `${event.headliners[0]} leads a multi-act bill that feels worth planning around.`;
+  }
+
+  if (Array.isArray(event.genres) && event.genres.length) {
+    return `The earliest strong option in the lineup leans ${event.genres[0].toLowerCase()}.`;
+  }
+
+  return "This is the earliest upcoming option in the current results.";
 }
 
 function escapeHtml(value) {

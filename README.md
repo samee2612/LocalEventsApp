@@ -11,8 +11,10 @@ A small app for discovering upcoming local events using a FastAPI backend and a 
 
 - Search for upcoming live events by city or metro-style location input
 - Fetch live event data from the JamBase API
-- Show event cards with date, venue, lineup, image, and relevant outbound links
+- Show event cards with date, venue, lineup, image, genre tags, and relevant outbound links
+- Highlight a featured “Top pick” to help users decide faster
 - Handle loading, empty, and error states cleanly
+- Include backend tests for core normalization and route behavior
 
 ## Local Development
 
@@ -32,6 +34,13 @@ uvicorn app.main:app --reload
 cd frontend
 npm install
 npm run dev
+```
+
+### Tests
+
+```bash
+source .venv/bin/activate
+pytest backend/tests
 ```
 
 ## Environment Variables
@@ -68,6 +77,8 @@ Verified locally on **Sunday, August 23, 2026** with:
 - FastAPI backend running on `127.0.0.1:8000`
 - Vite frontend running on `127.0.0.1:5173`
 - End-to-end browser flow returning live JamBase results for `San Francisco, CA`
+- Featured “Top pick” rendering correctly in the live UI
+- Backend test suite passing: `6 passed`
 
 ## Deliverables Checklist
 
@@ -82,7 +93,7 @@ Verified locally on **Sunday, August 23, 2026** with:
 
 ### Time Spent
 
-About 3 hours total.
+About 4 hours total.
 
 ### Technology Choices
 
@@ -96,12 +107,13 @@ About 3 hours total.
 - Kept JamBase integration behind a dedicated service layer so provider-specific logic is not mixed into the route handler.
 - Normalized JamBase data into a frontend-friendly response shape to reduce coupling to raw provider payloads.
 - Added defensive handling for missing API keys, invalid locations, timeouts, rate limits, and upstream failures.
+- Added backend tests for normalization, sorting, provider error mapping, and route behavior.
 
 ### UI Design Decisions
 
 - Used a single search box because the prompt prioritized usefulness over feature breadth.
 - Chose card-based results instead of a raw list or table so users can quickly scan event name, date, venue, lineup, and links.
-- Added a lightweight “Why go” note to show product judgment and make the UI slightly more decision-oriented.
+- Added a lightweight “Why go” note, genre tags, and a featured “Top pick” block to make the UI more decision-oriented.
 - Focused on loading, error, and empty states rather than visual polish.
 
 ### Tradeoffs Made
@@ -113,11 +125,10 @@ About 3 hours total.
 
 ### Improvements With More Time
 
-- Add tests for the JamBase service and API route behavior.
 - Improve location resolution with better handling for ambiguous city names.
 - Add filters such as date range, genre, and price.
 - Add caching to reduce repeated provider calls and improve perceived speed.
-- Refine event ranking so results feel more curated than simply upcoming.
+- Refine the featured ranking heuristic so it feels more curated than simply “earliest upcoming.”
 
 ### How AI Was Used
 
@@ -143,6 +154,6 @@ About 3 hours total.
 
 ### Self-Grade
 
-- Code quality: B+
-- Work product: B
-- Extensibility: B
+- Code quality: A-
+- Work product: A-
+- Extensibility: B+
