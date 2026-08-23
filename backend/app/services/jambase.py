@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -57,6 +57,8 @@ class JamBaseClient:
 
         raw_events = events_payload.get("events", [])
         pagination = events_payload.get("pagination", {})
+        normalized_events = [self._normalize_event(event) for event in raw_events]
+        sorted_events = sorted(normalized_events, key=self._event_sort_key)
 
         return EventSearchResponse(
             location=SearchLocation(
@@ -73,7 +75,7 @@ class JamBaseClient:
                 total_items=int(pagination.get("totalItems", len(raw_events))),
                 total_pages=int(pagination.get("totalPages", 1)),
             ),
-            events=[self._normalize_event(event) for event in raw_events],
+            events=sorted_events,
         )
 
     async def _resolve_location(self, location_query: str) -> ResolvedLocation:
@@ -261,6 +263,22 @@ class JamBaseClient:
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return None
+
+    def _event_sort_key(self, event: EventSummary) -> tuple[datetime, str]:
+        parsed_start = self._parse_event_datetime(event.start_date)
+        if parsed_start is None:
+            return (datetime.max, event.name.lower())
+        return (parsed_start, event.name.lower())
+
+    def _parse_event_datetime(self, value: str | None) -> datetime | None:
+        if not value:
+            return None
+
+        normalized = value.strip().replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
 
     def _parse_location_query(self, location_query: str) -> tuple[str, str | None]:
         parts = [part.strip() for part in location_query.split(",") if part.strip()]
