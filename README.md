@@ -2,6 +2,9 @@
 
 A small app for discovering upcoming local events using a FastAPI backend and a simple frontend.
 
+<img width="1919" height="1041" alt="image" src="https://github.com/user-attachments/assets/f95e4793-235f-4b09-b129-d6d0077b8baf" />
+
+
 ## Tech Stack
 
 - Backend: Python, FastAPI, HTTPX
