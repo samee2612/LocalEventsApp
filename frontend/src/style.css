@@ -262,6 +262,26 @@ h1 {
   line-height: 1.5;
 }
 
+.genre-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.genre-tag {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(154, 77, 0, 0.1);
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .event-facts {
   margin: 18px 0;
   display: grid;

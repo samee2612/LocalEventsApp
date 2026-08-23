@@ -11,6 +11,7 @@ class EventSummary(BaseModel):
     venue_region: str | None = None
     venue_country: str | None = None
     headliners: list[str] = Field(default_factory=list)
+    genres: list[str] = Field(default_factory=list)
     image_url: str | None = None
     event_url: str | None = None
     ticket_url: str | None = None

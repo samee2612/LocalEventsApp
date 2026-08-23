@@ -146,6 +146,7 @@ function renderEventCard(event) {
   const when = formatDate(event.start_date);
   const where = formatVenue(event);
   const price = formatPrice(event.min_price, event.max_price);
+  const genres = formatGenres(event.genres);
   const image = event.image_url
     ? `<img class="event-image" src="${escapeHtml(event.image_url)}" alt="${escapeHtml(event.name)}" />`
     : `<div class="event-image event-image-placeholder">Live music</div>`;
@@ -160,6 +161,7 @@ function renderEventCard(event) {
         </div>
         <h3 class="event-title">${escapeHtml(event.name)}</h3>
         <p class="event-performers">${escapeHtml(performers)}</p>
+        ${genres}
         <dl class="event-facts">
           <div>
             <dt>Venue</dt>
@@ -244,7 +246,23 @@ function formatPrice(minPrice, maxPrice) {
   return formatter.format(minPrice ?? maxPrice);
 }
 
+function formatGenres(genres = []) {
+  if (!Array.isArray(genres) || !genres.length) {
+    return "";
+  }
+
+  return `
+    <ul class="genre-list" aria-label="Genres">
+      ${genres.map((genre) => `<li class="genre-tag">${escapeHtml(genre)}</li>`).join("")}
+    </ul>
+  `;
+}
+
 function buildRecommendation(event) {
+  if (Array.isArray(event.genres) && event.genres.length) {
+    return `Strong fit if you're in the mood for ${event.genres[0].toLowerCase()} tonight.`;
+  }
+
   if (Array.isArray(event.headliners) && event.headliners.length > 1) {
     return `Multiple billed acts make this a stronger value night.`;
   }

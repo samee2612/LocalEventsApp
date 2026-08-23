@@ -181,12 +181,14 @@ class JamBaseClient:
         location = event.get("location") or {}
         address = location.get("address") or {}
         offers = event.get("offers") or []
+        performers = event.get("performer", [])
 
         headliners = [
             performer.get("name")
-            for performer in event.get("performer", [])
+            for performer in performers
             if isinstance(performer, dict) and performer.get("name")
         ]
+        genres = self._extract_genres(performers)
 
         prices = [
             offer.get("price")
@@ -216,6 +218,7 @@ class JamBaseClient:
             venue_region=region,
             venue_country=country,
             headliners=headliners,
+            genres=genres,
             image_url=self._pick_image(event.get("image")),
             event_url=self._first_string(event, "url"),
             ticket_url=ticket_url,
@@ -263,6 +266,35 @@ class JamBaseClient:
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return None
+
+    def _extract_genres(self, performers: list[Any]) -> list[str]:
+        seen: set[str] = set()
+        genres: list[str] = []
+
+        for performer in performers:
+            if not isinstance(performer, dict):
+                continue
+
+            raw_genres = performer.get("genre")
+            if not isinstance(raw_genres, list):
+                continue
+
+            for genre in raw_genres:
+                if not isinstance(genre, str):
+                    continue
+
+                normalized = genre.strip()
+                if not normalized:
+                    continue
+
+                key = normalized.lower()
+                if key in seen:
+                    continue
+
+                seen.add(key)
+                genres.append(normalized.title())
+
+        return genres[:4]
 
     def _event_sort_key(self, event: EventSummary) -> tuple[datetime, str]:
         parsed_start = self._parse_event_datetime(event.start_date)
